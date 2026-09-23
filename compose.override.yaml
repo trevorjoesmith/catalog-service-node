@@ -1,0 +1,4 @@
+services:
+  demo-client:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
