@@ -1,0 +1,39 @@
+schemaVersion: "2"
+kind: mixin
+name: catalog-demo
+displayName: Catalog service SDLC demo
+description: >
+  Spins up the catalog-service-node SDLC demo — installs dependencies,
+  applies the missing-UPC bug patch, and starts the docker compose stack
+  (Postgres, Kafka, LocalStack, WireMock, pgAdmin, Kafbat UI).
+requires:
+  agent: claude
+
+setup:
+  startup:
+    - command: ["sh", "-c", "cd \"$WORKSPACE_DIR\" && npm install"]
+      description: "Install node dependencies"
+    - command: ["sh", "-c", "cd \"$WORKSPACE_DIR\" && [ -f .demo-patched ] || (git apply --whitespace=fix demo/sdlc-e2e/demo.patch && touch .demo-patched)"]
+      description: "Apply the missing-UPC demo patch, once"
+    - command: ["sh", "-c", "cd \"$WORKSPACE_DIR\" && docker compose pull"]
+      description: "Pull compose images"
+    - command: ["sh", "-c", "cd \"$WORKSPACE_DIR\" && docker compose up -d > /tmp/compose-up.log 2>&1"]
+      background: true
+      description: "Start the compose stack"
+
+permissions:
+  network:
+    allow:
+      - registry.npmjs.org
+      - "*.docker.io"
+      - auth.docker.io
+
+agentInstructions:
+  content: |
+    This sandbox mirrors the catalog-service-node SDLC demo.
+    - The docker compose stack is already running (Postgres, Kafka,
+      LocalStack, WireMock, pgAdmin, Kafbat UI).
+    - Run `npm run dev` to start the catalog API natively against it.
+    - The applied patch reproduces GitHub issue #19: the
+      `product_created` Kafka event is missing the `upc` field.
+      That's the bug to fix.
