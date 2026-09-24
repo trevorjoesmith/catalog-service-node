@@ -1,0 +1,52 @@
+schemaVersion: "2"
+kind: mixin
+name: catalog-demo
+displayName: Catalog service SDLC demo
+description: >
+  Spins up the catalog-service-node SDLC demo — installs dependencies,
+  applies the missing-UPC bug patch, starts the docker compose stack
+  (Postgres, Kafka, LocalStack, WireMock, pgAdmin, Kafbat UI), and
+  starts the catalog API natively on port 3000.
+requires:
+  agent: claude
+
+setup:
+  startup:
+    - command: ["sh", "-c", "cd \"$WORKSPACE_DIR\" && npm install"]
+      description: "Install node dependencies"
+    - command: ["sh", "-c", "cd \"$WORKSPACE_DIR\" && [ -f .demo-patched ] || (git apply --whitespace=fix demo/sdlc-e2e/demo.patch && touch .demo-patched)"]
+      description: "Apply the missing-UPC demo patch, once"
+    - command: ["sh", "-c", "cd \"$WORKSPACE_DIR\" && docker compose pull"]
+      description: "Pull compose images"
+    - command: ["sh", "-c", "cd \"$WORKSPACE_DIR\" && docker compose up -d > /tmp/compose-up.log 2>&1"]
+      background: true
+      description: "Start the compose stack"
+    - command: ["sh", "-c", "cd \"$WORKSPACE_DIR\" && npm run dev > /tmp/api-dev.log 2>&1"]
+      background: true
+      description: "Start the catalog API natively on port 3000"
+
+permissions:
+  network:
+    allow:
+      - registry.npmjs.org
+      - "*.docker.io"
+      - auth.docker.io
+
+agentInstructions:
+  content: |
+    This sandbox mirrors the catalog-service-node SDLC demo.
+    - The docker compose stack is already running (Postgres, Kafka,
+      LocalStack, WireMock, pgAdmin, Kafbat UI), and the catalog API
+      is already running natively (`npm run dev`) on port 3000. Before
+      telling anyone the stack is ready, verify with
+      `curl -sf localhost:3000/api/products` — if it's not responding
+      yet, check /tmp/api-dev.log and /tmp/compose-up.log and retry;
+      the API can take a few seconds after boot to accept connections.
+    - The web client on port 5173 calls the API through /api — a 500
+      there almost always means the API isn't up yet, not a code bug.
+    - Kafbat UI (Kafka's web console) is on port 8080; the catalog API
+      itself is on port 3000. If you want to curl the API from the
+      host, publish 3000, not 8080.
+    - The applied patch reproduces GitHub issue #19: the
+      `product_created` Kafka event is missing the `upc` field.
+      That's the bug to fix.
